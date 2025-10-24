@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">Order Food Online</h1>
+        <p class="lead mb-4">Discover the best restaurants and dishes near you</p>
+    </div>
+</div>
+
+<div class="row">
+    {% for restaurant in restaurants %}
+    <div class="col-md-4 mb-4">
+        <div class="card restaurant-card h-100">
+            <div style="height: 200px; background-color: #2c2c2c; display: flex; align-items: center; justify-content: center;">
+                <span>{{ restaurant.name }}</span>
+            </div>
+            <div class="card-body d-flex flex-column">
+                <h5 class="card-title">{{ restaurant.name }}</h5>
+                <p class="card-text">{{ restaurant.address }}</p>
+                <div class="mt-auto">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="badge bg-success">{{ restaurant.phone_number }}</span>
+                        <a href="{{ url_for('restaurant', restaurant_id=restaurant.restaurant_id) }}" class="btn btn-primary">View Menu</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

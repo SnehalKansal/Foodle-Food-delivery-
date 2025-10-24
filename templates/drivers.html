@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Drivers - FoodExpress{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1>Drivers</h1>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2>Driver List</h2>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addDriverModal">Add Driver</button>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Phone Number</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for driver in drivers %}
+                    <tr>
+                        <td>{{ driver.driver_id }}</td>
+                        <td>{{ driver.name }}</td>
+                        <td>{{ driver.phone_number }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add Driver Modal -->
+<div class="modal fade" id="addDriverModal" tabindex="-1" aria-labelledby="addDriverModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addDriverModalLabel">Add New Driver</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form>
+                    <div class="mb-3">
+                        <label for="driverName" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="driverName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="driverPhone" class="form-label">Phone Number</label>
+                        <input type="text" class="form-control" id="driverPhone" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary">Save Driver</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
