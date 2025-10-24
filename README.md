@@ -1,6 +1,6 @@
 # Foodle - Food Delivery App
 
-A Flask-based food delivery web application with MySQL database integration, designed with a dark-themed UI and Indian Rupee pricing.
+A Flask-based food delivery web application with MySQL database integration.
 
 ## Features
 
