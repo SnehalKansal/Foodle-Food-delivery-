@@ -71,9 +71,3 @@ The application automatically creates the following tables:
 
 
 
-## Technologies Used
-
-- Flask (Python web framework)
-- MySQL (Database)
-- Bootstrap 5 (Frontend framework with dark theme)
-- python-dotenv (Environment variable management)
