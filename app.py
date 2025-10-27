@@ -4,19 +4,15 @@ from mysql.connector import Error
 from dotenv import load_dotenv
 import os
 
-# Load environment variables from .env file
 load_dotenv()
 
 app = Flask(__name__)
 
-# Database configuration - loaded from .env file
 app.config['MYSQL_HOST'] = os.getenv('MYSQL_HOST', 'localhost')
 app.config['MYSQL_USER'] = os.getenv('MYSQL_USER', 'root')
 app.config['MYSQL_PASSWORD'] = os.getenv('MYSQL_PASSWORD', '')
 app.config['MYSQL_DB'] = os.getenv('MYSQL_DB', 'food_delivery')
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'fallback-secret-key')
 
-# Function to create a database connection
 def create_connection():
     connection = mysql.connector.connect(
         host=app.config['MYSQL_HOST'],
@@ -26,103 +22,11 @@ def create_connection():
     )
     return connection
 
-# Function to initialize the database with tables
-def init_db():
-    connection = create_connection()
-    if connection:
-        cursor = connection.cursor()
-        
-        # Create customers table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS customers (
-                customer_id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                email VARCHAR(255) UNIQUE NOT NULL,
-                address TEXT NOT NULL
-            )
-        """)
-        
-        # Create restaurants table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS restaurants (
-                restaurant_id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                address TEXT NOT NULL,
-                phone_number VARCHAR(20) NOT NULL
-            )
-        """)
-        
-        # Create drivers table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS drivers (
-                driver_id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                phone_number VARCHAR(20) NOT NULL,
-                vehicle_details TEXT
-            )
-        """)
-        
-        # Create menus table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS menus (
-                menu_id INT AUTO_INCREMENT PRIMARY KEY,
-                restaurant_id INT NOT NULL,
-                FOREIGN KEY (restaurant_id) REFERENCES restaurants(restaurant_id)
-            )
-        """)
-        
-        # Create menu_items table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS menu_items (
-                menu_item_id INT AUTO_INCREMENT PRIMARY KEY,
-                menu_id INT NOT NULL,
-                name VARCHAR(255) NOT NULL,
-                description TEXT,
-                price DECIMAL(10,2) NOT NULL,
-                FOREIGN KEY (menu_id) REFERENCES menus(menu_id)
-            )
-        """)
-        
-        # Create orders table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS orders (
-                order_id INT AUTO_INCREMENT PRIMARY KEY,
-                customer_id INT NOT NULL,
-                restaurant_id INT NOT NULL,
-                driver_id INT,
-                order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                status VARCHAR(50) DEFAULT 'pending',
-                FOREIGN KEY (customer_id) REFERENCES customers(customer_id),
-                FOREIGN KEY (restaurant_id) REFERENCES restaurants(restaurant_id),
-                FOREIGN KEY (driver_id) REFERENCES drivers(driver_id)
-            )
-        """)
-        
-        # Create order_items table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS order_items (
-                order_item_id INT AUTO_INCREMENT PRIMARY KEY,
-                order_id INT NOT NULL,
-                menu_item_id INT NOT NULL,
-                quantity INT DEFAULT 1,
-                FOREIGN KEY (order_id) REFERENCES orders(order_id),
-                FOREIGN KEY (menu_item_id) REFERENCES menu_items(menu_item_id)
-            )
-        """)
-        
-        connection.commit()
-        cursor.close()
-        connection.close()
-
-# Initialize the database when the app starts
-init_db()
-
-# In-memory cart (in a real app, you might want to store this in the session or database)
+# Initialize cart as a list of dictionaries with quantity
 cart = []
 
 @app.route('/')
 def index():
-    # Fetch restaurants from database
     connection = create_connection()
     cursor = connection.cursor(dictionary=True)
     cursor.execute("SELECT * FROM restaurants")
@@ -133,107 +37,166 @@ def index():
 
 @app.route('/restaurant/<int:restaurant_id>')
 def restaurant(restaurant_id):
-    # Fetch restaurant and menu items from database
     connection = create_connection()
     cursor = connection.cursor(dictionary=True)
     
     # Get restaurant details
     cursor.execute("SELECT * FROM restaurants WHERE restaurant_id = %s", (restaurant_id,))
-    restaurant = cursor.fetchone()
-    
-    if not restaurant:
-        cursor.close()
-        connection.close()
-        return "Restaurant not found", 404
+    db_restaurant = cursor.fetchone()
     
     # Get menu items for this restaurant
     cursor.execute("""
-        SELECT mi.* 
+        SELECT mi.*, r.name as restaurant_name 
         FROM menu_items mi 
-        JOIN menus m ON mi.menu_id = m.menu_id 
-        WHERE m.restaurant_id = %s
+        JOIN restaurants r ON mi.restaurant_id = r.restaurant_id 
+        WHERE mi.restaurant_id = %s
     """, (restaurant_id,))
-    items = cursor.fetchall()
+    db_items = cursor.fetchall()
     
     cursor.close()
     connection.close()
-    return render_template('restaurant.html', restaurant=restaurant, items=items, cart_count=len(cart))
+    
+    return render_template('restaurant.html', restaurant=db_restaurant, items=db_items, cart=cart, cart_count=len(cart))
 
 @app.route('/add_to_cart/<int:item_id>')
 def add_to_cart(item_id):
-    # Fetch item from database
     connection = create_connection()
-    cursor = connection.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM menu_items WHERE menu_item_id = %s", (item_id,))
+    cursor = connection.cursor()
+    cursor.execute("SELECT menu_item_id, restaurant_id, name, description, price FROM menu_items WHERE menu_item_id = %s", (item_id,))
     item = cursor.fetchone()
     cursor.close()
     connection.close()
     
     if item:
-        cart.append(item)
+        # Convert tuple to list to access by index
+        item_list = list(item)
         
+        # Create a dictionary from the list result
+        item_dict = {
+            'menu_item_id': item_list[0],
+            'restaurant_id': item_list[1],
+            'name': item_list[2],
+            'description': item_list[3],
+            'price': float(str(item_list[4])) if item_list[4] else 0.0
+        }
+        
+        # Get restaurant name for the cart message
+        connection = create_connection()
+        cursor = connection.cursor()
+        cursor.execute("SELECT name FROM restaurants WHERE restaurant_id = %s", (item_dict['restaurant_id'],))
+        restaurant = cursor.fetchone()
+        cursor.close()
+        connection.close()
+        
+        if restaurant:
+            restaurant_list = list(restaurant)
+            item_dict['restaurant_name'] = restaurant_list[0]
+        
+        # Check if item already exists in cart
+        existing_item = None
+        for i, cart_item in enumerate(cart):
+            if cart_item['menu_item_id'] == item_dict['menu_item_id']:
+                existing_item = i
+                break
+        
+        if existing_item is not None:
+            # Increase quantity if item already in cart
+            cart[existing_item]['quantity'] += 1
+        else:
+            # Add new item with quantity 1
+            item_dict['quantity'] = 1
+            cart.append(item_dict)
+        
+    return redirect(url_for('cart_page'))
+
+@app.route('/update_quantity/<int:item_id>/<string:action>')
+def update_quantity(item_id, action):
+    # Find the item in cart
+    for i, item in enumerate(cart):
+        if item['menu_item_id'] == item_id:
+            if action == 'increase':
+                cart[i]['quantity'] += 1
+            elif action == 'decrease' and item['quantity'] > 1:
+                cart[i]['quantity'] -= 1
+            elif action == 'decrease' and item['quantity'] == 1:
+                # Remove item if quantity would be 0
+                cart.pop(i)
+            break
+    
     return redirect(url_for('cart_page'))
 
 @app.route('/cart')
 def cart_page():
-    total = sum(item['price'] for item in cart)
+    total = sum(float(str(item['price'])) * item['quantity'] for item in cart)
     return render_template('cart.html', cart=cart, total=total, cart_count=len(cart))
 
 @app.route('/checkout', methods=['GET', 'POST'])
 def checkout():
     if request.method == 'POST':
-        # Save order to database
         connection = create_connection()
         cursor = None
         try:
             cursor = connection.cursor()
             
-            # For now, we'll create a simple customer record
-            # In a real app, you'd have proper customer management
             customer_name = request.form['name']
-            customer_email = request.form['email']  # Use the provided email
+            customer_email = request.form['email']
             customer_address = request.form['address']
+            customer_phone = request.form['phone']  # Get phone number from form
             
-            # Insert customer (in a real app, you'd check if they already exist)
             cursor.execute("""
                 INSERT INTO customers (name, email, address) 
                 VALUES (%s, %s, %s)
             """, (customer_name, customer_email, customer_address))
             customer_id = cursor.lastrowid
             
-            # For simplicity, assign order to restaurant 1 and driver 1
-            # In a real app, you'd have logic to determine these
-            restaurant_id = 1
-            driver_id = 1
+            # Use the restaurant_id from the first item in the cart
+            restaurant_id = cart[0]['restaurant_id'] if cart else 1
             
-            # Insert order (removed total_amount since it's not in the schema)
+            # Get the count of existing orders to determine which driver to assign
+            cursor.execute("SELECT COUNT(*) FROM orders")
+            order_count_result = cursor.fetchone()
+            order_count_list = list(order_count_result) if order_count_result else [0]
+            order_count = int(str(order_count_list[0])) if order_count_list else 0
+            
+            # Get all available drivers
+            cursor.execute("SELECT driver_id FROM drivers")
+            drivers = cursor.fetchall()
+            
+            # Assign driver using round-robin approach
+            if drivers:
+                driver_list = []
+                for driver in drivers:
+                    driver_item_list = list(driver)
+                    driver_list.append(int(str(driver_item_list[0])))
+                driver_id = driver_list[order_count % len(driver_list)]
+            else:
+                driver_id = None  # No drivers available
+            
             cursor.execute("""
-                INSERT INTO orders (customer_id, restaurant_id, driver_id, status)
-                VALUES (%s, %s, %s, %s)
-            """, (customer_id, restaurant_id, driver_id, 'pending'))
+                INSERT INTO orders (customer_id, restaurant_id, driver_id)
+                VALUES (%s, %s, %s)
+            """, (customer_id, restaurant_id, driver_id))
             order_id = cursor.lastrowid
             
-            # Insert order items
             for item in cart:
                 cursor.execute("""
                     INSERT INTO order_items (order_id, menu_item_id, quantity)
                     VALUES (%s, %s, %s)
-                """, (order_id, item['menu_item_id'], 1))
+                """, (order_id, item['menu_item_id'], item['quantity']))
             
             connection.commit()
             
-            # Prepare order details for confirmation page
-            total_amount = sum(item['price'] for item in cart)
+            total_amount = sum(float(str(item['price'])) * item['quantity'] for item in cart)
             order_details = {
                 'order_id': order_id,
                 'customer_name': customer_name,
-                'customer_email': customer_email,  # Add email to order details
+                'customer_email': customer_email,
                 'delivery_address': customer_address,
+                'phone': customer_phone,  # Include phone number in order details
                 'items': cart.copy(),
                 'total': total_amount
             }
             
-            # Clear the cart
             cart.clear()
             cursor.close()
             connection.close()
@@ -244,27 +207,35 @@ def checkout():
             if cursor:
                 cursor.close()
             connection.close()
-            # Prepare order details for confirmation page even if there was an error
             order_details = {
                 'customer_name': request.form['name'],
-                'customer_email': request.form['email'],  # Add email to fallback
+                'customer_email': request.form['email'],
                 'delivery_address': request.form['address'],
                 'phone': request.form.get('phone', ''),
                 'items': cart.copy(),
-                'total': sum(item['price'] for item in cart)
+                'total': sum(float(str(item['price'])) * item['quantity'] for item in cart)
             }
             cart.clear()
             return render_template('order_confirmation.html', order=order_details, cart_count=len(cart))
     
-    total = sum(item['price'] for item in cart)
+    # Check if cart is empty
+    if not cart:
+        return redirect(url_for('index'))
+    
+    total = sum(float(str(item['price'])) * item['quantity'] for item in cart)
     return render_template('checkout.html', total=total, cart_count=len(cart))
 
 @app.route('/customers')
 def customers():
-    # Fetch customers from database
     connection = create_connection()
     cursor = connection.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM customers")
+    # Fetch unique customers by selecting distinct emails
+    cursor.execute("""
+        SELECT MIN(customer_id) as customer_id, name, email, address
+        FROM customers
+        GROUP BY email, name, address
+        ORDER BY MIN(customer_id)
+    """)
     db_customers = cursor.fetchall()
     cursor.close()
     connection.close()
@@ -272,7 +243,6 @@ def customers():
 
 @app.route('/drivers')
 def drivers():
-    # Fetch drivers from database
     connection = create_connection()
     cursor = connection.cursor(dictionary=True)
     cursor.execute("SELECT * FROM drivers")
@@ -283,10 +253,9 @@ def drivers():
 
 @app.route('/orders')
 def orders():
-    # Fetch orders from database
     connection = create_connection()
     cursor = connection.cursor(dictionary=True)
-    cursor.execute("""
+    cursor.execute(operation="""
         SELECT o.*, c.name as customer_name, c.email as customer_email, r.name as restaurant_name, d.name as driver_name,
                COALESCE(SUM(mi.price * oi.quantity), 0) as total_amount
         FROM orders o

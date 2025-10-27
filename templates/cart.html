@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Your Cart - FoodExpress{% endblock %}
+{% block title %}Your Cart - Foodle{% endblock %}
 
 {% block content %}
 <h1>Your Cart</h1>
@@ -8,6 +8,9 @@
 {% if cart %}
 <div class="row">
     <div class="col-12">
+        <div class="alert alert-info" role="alert">
+            <strong>Note:</strong> You can only order items from one restaurant at a time. Your current items are from {{ cart[0]['restaurant_name'] if cart[0].get('restaurant_name') else 'a restaurant' }}.
+        </div>
         <div class="table-responsive">
             <table class="table">
                 <thead>
@@ -15,6 +18,8 @@
                         <th>Item</th>
                         <th>Description</th>
                         <th>Price</th>
+                        <th>Quantity</th>
+                        <th>Total</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -22,21 +27,29 @@
                     <tr>
                         <td>{{ item.name }}</td>
                         <td>{{ item.description }}</td>
-                        <td>${{ item.price }}</td>
+                        <td>Rs. {{ item.price }}</td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <a href="{{ url_for('update_quantity', item_id=item.menu_item_id, action='decrease') }}" class="btn btn-sm btn-outline-secondary">-</a>
+                                <span class="mx-2">{{ item.quantity }}</span>
+                                <a href="{{ url_for('update_quantity', item_id=item.menu_item_id, action='increase') }}" class="btn btn-sm btn-outline-secondary">+</a>
+                            </div>
+                        </td>
+                        <td>Rs. {{ "%.2f"|format(item.price * item.quantity) }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
                 <tfoot>
                     <tr>
-                        <th colspan="2">Total</th>
-                        <th>${{ total }}</th>
+                        <th colspan="4">Total</th>
+                        <th>Rs. {{ "%.2f"|format(total) }}</th>
                     </tr>
                 </tfoot>
             </table>
         </div>
         
         <div class="d-flex justify-content-end mt-3">
-            <a href="{{ url_for('index') }}" class="btn btn-secondary me-2">Continue Shopping</a>
+            <a href="{{ url_for('restaurant', restaurant_id=cart[0]['restaurant_id']) if cart else url_for('index') }}" class="btn btn-secondary me-2">Continue Shopping</a>
             <a href="{{ url_for('checkout') }}" class="btn btn-success">Proceed to Checkout</a>
         </div>
     </div>

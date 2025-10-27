@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Order Confirmation - FoodExpress{% endblock %}
+{% block title %}Order Confirmation - Foodle{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -26,21 +26,25 @@
                         <thead>
                             <tr>
                                 <th>Item</th>
+                                <th>Qty</th>
                                 <th>Price</th>
+                                <th>Total</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for item in order['items'] %}
                             <tr>
                                 <td>{{ item.name }}</td>
-                                <td>${{ item.price }}</td>
+                                <td>{{ item.quantity }}</td>
+                                <td>Rs. {{ item.price }}</td>
+                                <td>Rs. {{ "%.2f"|format(item.price * item.quantity) }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
                         <tfoot>
                             <tr>
-                                <th>Total</th>
-                                <th>${{ order['total'] }}</th>
+                                <th colspan="3">Total</th>
+                                <th>Rs. {{ "%.2f"|format(order['total']) }}</th>
                             </tr>
                         </tfoot>
                     </table>

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Checkout - FoodExpress{% endblock %}
+{% block title %}Checkout - Foodle{% endblock %}
 
 {% block content %}
 <h1>Checkout</h1>
@@ -45,14 +45,17 @@
                 <ul class="list-group list-group-flush">
                     {% for item in cart %}
                     <li class="list-group-item d-flex justify-content-between">
-                        <span>{{ item.name }}</span>
-                        <span>${{ item.price }}</span>
+                        <div>
+                            <div>{{ item.name }}</div>
+                            <small class="text-muted">Qty: {{ item.quantity }}</small>
+                        </div>
+                        <span>Rs. {{ "%.2f"|format(item.price * item.quantity) }}</span>
                     </li>
                     {% endfor %}
                 </ul>
                 <div class="d-flex justify-content-between mt-3 fw-bold">
                     <span>Total:</span>
-                    <span>${{ total }}</span>
+                    <span>Rs. {{ "%.2f"|format(total) }}</span>
                 </div>
             </div>
         </div>
